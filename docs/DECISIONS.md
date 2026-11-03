@@ -87,3 +87,31 @@ Hier stehen Defaults und Auslegungen, die die Spezifikation offen lässt.
 - **Fixtures:** Jede `tests/fixtures/mails/<name>.eml` braucht eine `<name>.json` mit dem
   erwarteten `parse_status`, `code` und optional `order_number`. Der Test läuft automatisch
   über alle Dateien.
+
+## Login und Registrierung
+
+- **Alle Links aus Mails** (Verifizierung, Magic-Link, E-Mail-Änderung, Aktionslinks)
+  zeigen bei GET nur eine Bestätigungsseite. Erst der POST ändert etwas, damit Mail-Scanner
+  nichts auslösen.
+- **Magic-Link einmalig:** Das signierte Token enthält `last_login`. Der Login ändert
+  `last_login`, damit sind dieser Link und alle älteren Links verbraucht. Keine DB-Tabelle
+  nötig. Gültigkeit 15 Minuten. Der Link funktioniert nur, wenn der User aktiv, bestätigt
+  und freigeschaltet ist, und das wird beim Einlösen erneut geprüft.
+- **Verifizierungs- und Änderungslinks** sind 3 Tage gültig.
+- **Keine Account-Enumeration:** Registrierung und Magic-Link-Anforderung antworten immer
+  gleich. Eine bekannte, unbestätigte Adresse bekommt die Verifizierungsmail erneut.
+- **Freischaltung** schickt eine kurze Mail „Du bist freigeschaltet“. Sonst würde der User
+  nie erfahren, wann er sich anmelden kann.
+- **Admins** melden sich unter `/konto/admin-anmelden/` mit E-Mail, Passwort und TOTP an.
+  Ein Admin, der sich per Magic-Link anmeldet, ist ein normaler User ohne OTP-Verifizierung
+  und sieht keine Admin-Views. Das Django-Admin (`/django-admin/`) ist eine `OTPAdminSite`.
+  Der erste Admin wird mit `manage.py create_admin` angelegt (Passwort und TOTP-Gerät).
+- **Rate-Limits** (Fixed Window im Django-Cache, in Produktion als DB-Cache für alle
+  gunicorn-Worker):
+  Registrierung 5/h pro IP; Magic-Link 10/15 min pro IP und 3/15 min pro Adresse;
+  Admin-Login 10/15 min pro IP und 5/15 min pro Adresse; E-Mail-Änderung 5/h pro IP.
+  Hinter dem Reverse Proxy `USE_X_FORWARDED_FOR=1` setzen. Dann gilt der rechteste Eintrag
+  aus `X-Forwarded-For`.
+- **Account löschen** ist nicht möglich, solange man einen Voucher hält (`assigned`,
+  `redeemed`, `paid`). Wartelisten-Einträge werden mitgelöscht. AuditLog-Einträge bleiben,
+  verlieren aber den Actor.

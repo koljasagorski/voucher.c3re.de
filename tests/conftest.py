@@ -22,7 +22,8 @@ def _send_mails_immediately(monkeypatch):
 
 
 @pytest.fixture
-def mails():
+def mails(db):
+    # Depends on ``db``: Django's test setup replaces ``mail.outbox`` with a new list.
     from django.core import mail
 
     mail.outbox.clear()

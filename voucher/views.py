@@ -114,6 +114,10 @@ def dashboard(request):  # replaced by the user dashboard
     return HttpResponse("")
 
 
+def admin_waitlist(request):  # replaced by the admin dashboard
+    return HttpResponse("")
+
+
 def admin_slots(request):  # replaced by the admin dashboard
     return HttpResponse("")
 

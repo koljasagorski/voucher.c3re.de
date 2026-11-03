@@ -9,5 +9,6 @@ admin.site.__class__ = OTPAdminSite
 urlpatterns = [
     path("healthz", lambda request: HttpResponse("ok"), name="healthz"),
     path("django-admin/", admin.site.urls),
+    path("konto/", include("accounts.urls")),
     path("", include("voucher.urls")),
 ]

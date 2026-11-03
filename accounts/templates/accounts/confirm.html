@@ -1,0 +1,9 @@
+{% extends "voucher/base.html" %}
+{% block title %}{{ title }} – Voucher-Warteliste{% endblock %}
+{% block content %}
+<h1>{{ title }}</h1>
+<div class="card">
+  <p>{{ text }}</p>
+  <form method="post">{% csrf_token %}<button type="submit">{{ button }}</button></form>
+</div>
+{% endblock %}

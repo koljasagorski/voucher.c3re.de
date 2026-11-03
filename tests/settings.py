@@ -16,3 +16,4 @@ VOUCHER_INBOX_ADDRESS = "voucher@example.de"
 ADMIN_EMAILS = ["orga@example.de"]
 VOUCHER_ALLOWED_SENDERS = ["tickets.events.ccc.de", "noreply@ccc.de"]
 VOUCHER_AUTHSERV_ID = "mx.example.de"
+OTP_TOTP_THROTTLE_FACTOR = 0

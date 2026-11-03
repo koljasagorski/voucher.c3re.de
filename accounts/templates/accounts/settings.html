@@ -1,0 +1,29 @@
+{% extends "voucher/base.html" %}
+{% block title %}Konto – Voucher-Warteliste{% endblock %}
+{% block content %}
+<h1>Konto</h1>
+<div class="card">
+  <p><strong>{{ user.nickname }}</strong><br><span class="muted">{{ user.email }}</span></p>
+</div>
+
+<h2>E-Mail-Adresse ändern</h2>
+<div class="card">
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {{ email_form.as_div }}
+    <p class="muted">Wir schicken einen Bestätigungslink an die neue Adresse. Erst danach wird sie übernommen.</p>
+    <div class="actions"><button type="submit" name="change_email">Bestätigungsmail schicken</button></div>
+  </form>
+</div>
+
+<h2>Account löschen</h2>
+<div class="card">
+  <p>Löscht deinen Account und deine Einträge auf der Warteliste. Das geht nicht, solange du einen Voucher hältst.</p>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {{ delete_form.non_field_errors }}
+    {{ delete_form.as_div }}
+    <div class="actions"><button type="submit" name="delete_account" class="danger">Account löschen</button></div>
+  </form>
+</div>
+{% endblock %}
