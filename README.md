@@ -206,6 +206,10 @@ docker compose exec worker python manage.py fetch_mail
    Voucherphase, Fristen und Policy eintragen und **Aktiv** setzen. Das bisherige Event
    wird dabei automatisch deaktiviert.
 2. Die Start-Voucher unter *Orga → Slots → Start-Voucher anlegen* eintragen.
+   Optional kannst du am Event **„Auslosung am“** setzen. Dann werden alle, die sich bis
+   dahin eintragen, einmal zufällig gereiht. Bis dahin werden keine Voucher automatisch
+   zugewiesen. Der Worker lost zum Stichtag automatisch aus. In der Warteliste geht das
+   auch vorzeitig mit „Jetzt auslosen“.
 3. Accounts bleiben bestehen. Alle müssen sich für das neue Event neu eintragen
    („Ich möchte ein Ticket“).
 4. `purge_old_data` löscht 90 Tage nach `phase_end` eines Events dessen Voucher,

@@ -4,11 +4,16 @@ Hier stehen Defaults und Auslegungen, die die Spezifikation offen lässt.
 
 ## Verteilungsmodell
 
-- Die Warteliste ist strikt FIFO nach `position`. Neue Einträge landen am Listenende.
-- **Nicht umgesetzt, aber als Option notiert:** Eine einmalige Auslosung aller Einträge,
-  die bis zu einem Stichtag (z. B. `phase_start`) eingegangen sind. Das würde den Vorteil
-  für „wer zuerst klickt“ bzw. „wer zuerst freigeschaltet wird“ entfernen. Admins können
-  die Reihenfolge ohnehin jederzeit per Drag-and-drop ändern.
+- Die Warteliste ist FIFO nach `position`. Neue Einträge landen am Listenende.
+- **Auslosung (optional, pro Event `lottery_at`):** Alle offenen Einträge, die bis zum
+  Stichtag entstanden sind, werden einmal zufällig gereiht (`random.SystemRandom`).
+  Spätere Einträge kommen in ihrer Reihenfolge dahinter. Das nimmt den Vorteil für „wer
+  zuerst klickt“ bzw. „wer zuerst freigeschaltet wird“. Bis zur Auslosung werden keine
+  Voucher automatisch zugewiesen, die gezielte Zuweisung durch Admins geht weiterhin.
+  `process_deadlines` lost automatisch aus, sobald der Stichtag erreicht ist. Admins können
+  mit „Jetzt auslosen“ vorziehen, dann zählen alle Einträge bis zu diesem Moment. Es wird
+  nur einmal pro Event ausgelost. Die gezogene Reihenfolge (Request-IDs) steht im AuditLog.
+  Admins können die Reihenfolge danach weiterhin von Hand ändern.
 
 ## Datenmodell
 
@@ -31,7 +36,7 @@ Hier stehen Defaults und Auslegungen, die die Spezifikation offen lässt.
   wirft `InvalidTransition` und ändert nichts. Es entstehen weder AuditLog-Einträge noch Mails.
 - **Freie Voucher verteilen:** Zusätzlich zu den in der Spezifikation genannten Auslösern
   werden freie Voucher auch dann verteilt, wenn jemand (wieder) `waiting` wird: beim
-  Eintragen, bei „Fortsetzen“ und nach „funktioniert nicht“. Sonst bliebe ein Voucher liegen,
+  Eintragen und bei „Fortsetzen“. Sonst bliebe ein Voucher liegen,
   der eingegangen ist, als niemand wartete.
 - **Fristablauf:** Die Person, deren Frist abgelaufen ist, bekommt denselben Voucher nicht
   sofort zurück, auch wenn sie nach `end_of_list` die Einzige ist, die wartet.
@@ -149,11 +154,10 @@ Hier stehen Defaults und Auslegungen, die die Spezifikation offen lässt.
 
 ## Nach dem unabhängigen Review
 
-- **„Voucher funktioniert nicht“ mehrfach (Abweichung von der Spezifikation):** Die erste
-  Meldung setzt die Person wie spezifiziert zurück auf `waiting` mit unveränderter Position.
-  Ab der zweiten Meldung derselben Person wird sie `paused` und bekommt erst wieder einen
-  Voucher, wenn ein Admin sie fortsetzt. Sonst könnte jemand Code um Code abholen, indem er
-  jeden als „funktioniert nicht“ meldet.
+- **„Voucher funktioniert nicht“ (Abweichung von der Spezifikation, so entschieden):** Die
+  Person behält ihre Position, wird aber `paused` statt `waiting`. Ein Admin prüft die
+  Meldung und setzt sie fort, erst dann bekommt sie den nächsten freien Voucher. Sonst
+  könnte jemand Code um Code abholen, indem er jeden als „funktioniert nicht“ meldet.
 - **Rate-Limits:** kein `cache.incr` mehr. Der DB-Cache setzt dabei den Timeout auf
   300 s zurück, dadurch wären alle Fenster auf 5 Minuten geschrumpft. Jetzt wird jeder
   Eintrag mit explizitem Timeout geschrieben. Das Fenster beginnt mit dem ersten Versuch.

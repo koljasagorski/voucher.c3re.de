@@ -7,12 +7,14 @@ Rules:
 - Every transition writes an :class:`AuditLog` entry. Voucher codes never go into it.
 """
 
+import random
 import re
 from datetime import timedelta
 
 from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.db.models import Max, Q
+from django.urls import reverse
 from django.utils import timezone
 
 from . import notifications
@@ -241,10 +243,14 @@ def _create_assignment(voucher, request, *, actor, via, allowed_request_statuses
 
 
 def assign_next(voucher, *, actor=None, via=Via.SYSTEM, exclude_request_ids=()):
-    """Give a free voucher to the first waiting person. No-op if auto_assign is off."""
+    """Give a free voucher to the first waiting person.
+
+    No-op if auto_assign is off or the event's lottery has not been drawn yet.
+    """
     with transaction.atomic():
         voucher = Voucher.objects.select_for_update().select_related("event").get(pk=voucher.pk)
-        if voucher.status != VS.RECEIVED or not voucher.event.auto_assign:
+        event = voucher.event
+        if voucher.status != VS.RECEIVED or not event.auto_assign or event.lottery_pending:
             return None
         candidate = (
             TicketRequest.objects.select_for_update()
@@ -353,17 +359,14 @@ def report_invalid(assignment, *, actor=None, via=Via.DASHBOARD):
     with transaction.atomic():
         assignment, voucher, request = _lock_assignment(assignment)
         _require(assignment.status == AS.ACTIVE and request.status == S.ASSIGNED)
-        # A second report by the same person pauses them: otherwise one person could
-        # collect code after code by reporting each one as "not working".
-        repeated = Assignment.objects.filter(
-            ticket_request=request, status=AS.REVOKED, revoke_reason="invalid"
-        ).exists()
         assignment.status = AS.REVOKED
         assignment.revoke_reason = "invalid"
         assignment.save(update_fields=["status", "revoke_reason"])
         _set_status(voucher, VS.INVALID)
-        _set_status(request, S.PAUSED if repeated else S.WAITING)  # position stays unchanged
-        audit("report_invalid", assignment, actor=actor, via=via, voucher_id=voucher.pk, paused=repeated)
+        # The person keeps their position but is paused until an admin checks the report and
+        # resumes them. Otherwise one could collect code after code by reporting each as broken.
+        _set_status(request, S.PAUSED)
+        audit("report_invalid", assignment, actor=actor, via=via, voucher_id=voucher.pk)
         notifications.invalid_confirmation(assignment)
         notifications.admin_alert(
             request.event,
@@ -371,13 +374,12 @@ def report_invalid(assignment, *, actor=None, via=Via.DASHBOARD):
             [
                 f"{request.user.nickname} meldet, dass Voucher #{voucher.pk} nicht funktioniert "
                 "(z. B. weil der Käufer des Vorgängers ihn selbst eingelöst hat).",
-                "Das ist schon die zweite Meldung dieser Person. Sie ist deshalb pausiert und bekommt "
-                "erst wieder einen Voucher, wenn ein Admin sie fortsetzt."
-                if repeated
-                else "Der Voucher ist als ungültig markiert, die Person wartet wieder auf ihrer alten Position.",
+                "Der Voucher ist als ungültig markiert. Die Person behält ihre Position, ist aber "
+                "pausiert. Bitte prüfen und in der Warteliste fortsetzen – dann bekommt sie den "
+                "nächsten freien Voucher.",
             ],
+            path=reverse("voucher:admin_waitlist") + "?status=paused",
         )
-        assign_free_vouchers(request.event)
     return assignment
 
 
@@ -690,11 +692,48 @@ def _remind_pay(assignment, now):
     return True
 
 
-def process_deadlines(now=None):
-    """Send reminders and expire overdue assignments. Safe to run any number of times."""
+def run_lottery(event, *, actor=None, via=Via.SYSTEM, now=None):
+    """Draw the order once: everyone who joined up to the deadline is shuffled to the front.
+
+    Later entries keep their relative order behind them. Existing position values are reused.
+    Afterwards free vouchers are handed out. Returns the drawn requests in their new order.
+    """
     now = now or timezone.now()
+    with transaction.atomic():
+        event = _lock_event(event)
+        _require(event.lottery_pending, "Keine Auslosung offen")
+        open_requests = list(
+            TicketRequest.objects.select_for_update()
+            .filter(event=event, status__in=TicketRequest.OPEN_STATUSES)
+            .order_by("position", "pk")
+        )
+        cutoff = min(event.lottery_at, now)
+        drawn = [r for r in open_requests if r.created_at <= cutoff]
+        later = [r for r in open_requests if r.created_at > cutoff]
+        random.SystemRandom().shuffle(drawn)
+        positions = sorted(r.position for r in open_requests)
+        for request, position in zip(drawn + later, positions):
+            request.position = position
+        TicketRequest.objects.bulk_update(open_requests, ["position"])
+        event.lottery_done_at = now
+        event.save(update_fields=["lottery_done_at"])
+        audit("lottery", event, actor=actor, via=via, drawn=len(drawn), order=[r.pk for r in drawn])
+    # Outside the lottery transaction: assigning locks vouchers, which must come first.
+    assign_free_vouchers(event, actor=actor, via=via)
+    return drawn
+
+
+def process_deadlines(now=None):
+    """Draw due lotteries, send reminders, expire overdue assignments. Idempotent."""
+    now = now or timezone.now()
+    result = {"lotteries": 0, "redeem_reminders": 0, "expired": 0, "pay_reminders": 0}
+    for event in Event.objects.filter(lottery_at__lte=now, lottery_done_at__isnull=True):
+        try:
+            run_lottery(event, now=now)
+            result["lotteries"] += 1
+        except InvalidTransition:
+            pass
     active = Assignment.objects.select_related("ticket_request__event").filter(status=AS.ACTIVE)
-    result = {"redeem_reminders": 0, "expired": 0, "pay_reminders": 0}
 
     reminder_window = timedelta(hours=settings.VOUCHER_REDEEM_REMINDER_HOURS)
     for assignment in active.filter(
