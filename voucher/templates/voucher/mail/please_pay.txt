@@ -1,0 +1,14 @@
+{% autoescape off %}Hallo {{ user.nickname }},
+{% if reminder %}
+Erinnerung: Deine Bestellung ist noch nicht als bezahlt markiert.
+{% else %}
+danke, dein Voucher ist als eingelöst markiert.
+{% endif %}
+Bitte bezahle deine Bestellung jetzt, am besten mit Kreditkarte. Der Folgevoucher entsteht erst,
+wenn die Bestellung bezahlt und mindestens 24 Stunden alt ist (Replikation nur Mo–Fr abends).
+
+Wenn du bezahlt hast, klicke auf „Bezahlt“. Auf der Seite kannst du optional deine Bestellnummer
+eintragen. Damit können wir den Folgevoucher eindeutig dir zuordnen.
+
+Bezahlt: {{ links.paid }}
+{% endautoescape %}

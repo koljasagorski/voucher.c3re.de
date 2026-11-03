@@ -1,0 +1,24 @@
+{% extends "voucher/mail/base.html" %}
+{% block content %}
+<p>Hallo {{ user.nickname }},</p>
+{% if reminder %}<p><strong>Erinnerung:</strong> Dein Voucher ist noch nicht als eingelöst markiert. Die Frist läuft bald ab.</p>{% endif %}
+<p>für {{ event.name }} ist ein Voucher für dich reserviert.</p>
+<table style="border-collapse:collapse;margin:16px 0;">
+  <tr><td style="padding:4px 12px 4px 0;">Code</td><td style="padding:4px 0;font-family:monospace;font-size:18px;font-weight:bold;">{{ voucher.code }}</td></tr>
+  <tr><td style="padding:4px 12px 4px 0;">Shop</td><td style="padding:4px 0;"><a href="{{ shop_url }}">{{ shop_url }}</a></td></tr>
+  <tr><td style="padding:4px 12px 4px 0;">Frist</td><td style="padding:4px 0;">{{ deadline_long }}</td></tr>
+</table>
+<p><strong>Trage beim Einlösen {{ inbox_address }} als Empfängeradresse für den Folgevoucher ein.</strong></p>
+<ol>
+  <li>Öffne den Shop und löse den Code ein.</li>
+  <li>Gib als E-Mail-Adresse für den Folgevoucher {{ inbox_address }} an.</li>
+  <li>Bezahle am besten mit Kreditkarte, damit die Zahlung sofort durch ist.</li>
+  <li>Klicke danach auf „Eingelöst“.</li>
+</ol>
+<p style="font-size:14px;color:#444;">Der Folgevoucher entsteht erst, wenn deine Bestellung bezahlt und mindestens 24 Stunden alt ist. Der Ticketshop repliziert nur Mo–Fr abends.</p>
+<p>
+{% include "voucher/mail/_button.html" with url=links.redeemed label="Eingelöst" %}
+{% include "voucher/mail/_button.html" with url=links.invalid label="Voucher funktioniert nicht" secondary=True %}
+{% include "voucher/mail/_button.html" with url=links.withdraw label="Brauche kein Ticket mehr" secondary=True %}
+</p>
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "voucher/admin/base_admin.html" %}
+{% block title %}Mail #{{ mail.pk }} – Orga{% endblock %}
+{% block admin_content %}
+<h1>Mail #{{ mail.pk }}</h1>
+<div class="card">
+  <p><strong>{{ mail.subject }}</strong><br>
+  <span class="muted">{{ mail.from_address }} · {{ mail.received_at|date:"D d.m.Y H:i" }} · {{ mail.message_id }}</span></p>
+  <p>Status: <span class="badge">{{ mail.get_parse_status_display }}</span>{% if mail.voucher_id %} · Voucher #{{ mail.voucher_id }}{% endif %}</p>
+  {% if mail.admin_note %}<p>Notiz: {{ mail.admin_note }}</p>{% endif %}
+  <p class="muted">Authentication-Results: {{ mail.auth_results|default:"– (kein Header unseres Mailservers)" }}</p>
+</div>
+
+{% if editable %}
+<div class="card">
+  <form method="post" action="{% url 'voucher:admin_action' %}">{% csrf_token %}
+    <input type="hidden" name="op" value="mail_code"><input type="hidden" name="mail" value="{{ mail.pk }}">
+    <label for="code">Code manuell eintragen (wird als Folgevoucher registriert)</label>
+    <input type="text" id="code" name="code" autocomplete="off" required>
+    <div class="actions"><button>Code übernehmen</button></div>
+  </form>
+  <form method="post" action="{% url 'voucher:admin_action' %}">{% csrf_token %}
+    <input type="hidden" name="op" value="mail_discard"><input type="hidden" name="mail" value="{{ mail.pk }}">
+    <label for="note">Verwerfen (Notiz optional)</label>
+    <input type="text" id="note" name="note">
+    <div class="actions"><button class="secondary">Verwerfen</button></div>
+  </form>
+</div>
+{% endif %}
+
+<h2>Text</h2>
+<pre class="raw">{{ text }}</pre>
+<details><summary>Rohdaten</summary><pre class="raw">{{ mail.raw }}</pre></details>
+{% endblock %}

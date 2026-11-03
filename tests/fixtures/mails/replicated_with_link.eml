@@ -1,0 +1,33 @@
+Return-Path: <noreply@tickets.events.ccc.de>
+Authentication-Results: mx.example.de; dkim=pass (2048-bit key) header.d=tickets.events.ccc.de header.s=pretix; spf=pass smtp.mailfrom=noreply@tickets.events.ccc.de
+Authentication-Results: evil.example.net; dkim=fail
+From: Chaos Communication Congress <noreply@tickets.events.ccc.de>
+To: voucher@example.de
+Subject: Your voucher for 41C3
+Date: Tue, 03 Nov 2026 19:12:00 +0100
+Message-ID: <placeholder-replicated-0001@tickets.events.ccc.de>
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="b1"
+
+--b1
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+PLACEHOLDER - replace with a real replication mail when available.
+
+Hello,
+
+the order XY7Q9 has generated a new voucher for you:
+
+https://tickets.events.ccc.de/41c3/redeem?voucher=3DABCDEFGH23456789&subevent=3D
+
+Thanks!
+
+--b1
+Content-Type: text/html; charset=utf-8
+
+<p>PLACEHOLDER</p>
+<p>The order XY7Q9 has generated a new voucher for you:</p>
+<p><a href="https://tickets.events.ccc.de/41c3/redeem?voucher=ABCDEFGH23456789&amp;subevent=">Redeem now</a></p>
+
+--b1--

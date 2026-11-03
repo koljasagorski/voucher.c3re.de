@@ -1,0 +1,79 @@
+{% extends "voucher/base.html" %}
+{% block content %}
+<h1>Hallo {{ user.nickname }}</h1>
+
+{% if not event %}
+  <div class="card"><p>Zurzeit läuft keine Voucherphase.</p></div>
+{% else %}
+  <p class="muted">{{ event.name }} · Voucher im Umlauf: <strong>{{ in_circulation }}</strong></p>
+
+  {% if can_join %}
+    <div class="card">
+      <p>Du stehst noch nicht auf der Warteliste.</p>
+      <form method="post" action="{% url 'voucher:dashboard_action' %}">{% csrf_token %}
+        <button name="action" value="join">Ich möchte ein Ticket</button>
+      </form>
+    </div>
+  {% else %}
+    <div class="card">
+      <p>Status: <strong>{{ ticket_request.get_status_display }}</strong></p>
+      {% if ticket_request.status == "waiting" %}
+        <p>Vor dir warten <strong>{{ ahead }}</strong> Person{{ ahead|pluralize:"en" }}.</p>
+      {% elif ticket_request.status == "paused" %}
+        <p>Dein Platz ist pausiert. Du bekommst gerade keinen Voucher. Bei Fragen wende dich an die Admins.</p>
+      {% elif ticket_request.status == "paid" %}
+        <p>Danke! Sobald dein Folgevoucher eingeht, geben wir ihn weiter. Das dauert mindestens 24 Stunden nach der Bestellung und passiert nur Mo–Fr abends.</p>
+      {% elif ticket_request.status == "completed" %}
+        <p>Dein Folgevoucher ist eingegangen und wurde weitergegeben. Viel Spaß auf dem Congress!</p>
+      {% elif ticket_request.status == "removed" %}
+        <p>Du wurdest von der Liste entfernt. Bei Fragen wende dich an die Admins.</p>
+      {% endif %}
+
+      {% if assignment and ticket_request.status == "assigned" %}
+        <p>Dein Voucher-Code:</p>
+        <p class="code">{{ assignment.voucher.code }}</p>
+        <p>Bitte bis <strong>{{ deadline }}</strong> im <a href="{{ shop_url }}" rel="noreferrer">Ticketshop</a> einlösen.</p>
+        <p class="important">Trage beim Einlösen {{ inbox_address }} als Empfängeradresse für den Folgevoucher ein.</p>
+        <ol>
+          <li>Öffne den Ticketshop und löse den Code ein.</li>
+          <li>Gib als E-Mail-Adresse für den Folgevoucher {{ inbox_address }} an.</li>
+          <li>Bezahle am besten mit Kreditkarte.</li>
+          <li>Klicke danach hier auf „Eingelöst“.</li>
+        </ol>
+        <p class="muted">Der Folgevoucher entsteht erst, wenn die Bestellung bezahlt und mindestens 24 Stunden alt ist. Der Ticketshop repliziert nur Mo–Fr abends.</p>
+      {% elif assignment and ticket_request.status == "redeemed" %}
+        <p>Bitte bezahle deine Bestellung jetzt, am besten mit Kreditkarte, und klicke dann auf „Bezahlt“.</p>
+      {% endif %}
+
+      {% if buttons %}
+        <form method="post" action="{% url 'voucher:dashboard_action' %}">{% csrf_token %}
+          {% if ticket_request.status == "assigned" or ticket_request.status == "redeemed" %}
+            <label for="id_order_number">Bestellnummer (optional)</label>
+            {{ order_form.order_number }}
+          {% endif %}
+          <div class="actions">
+            {% for name, meta in buttons %}
+              <button name="action" value="{{ name }}" class="{% if name == 'withdraw' or name == 'invalid' %}secondary{% endif %}"
+                {% if name == 'withdraw' %}onclick="return confirm('Platz wirklich freigeben?')"{% endif %}>{{ meta.label }}</button>
+            {% endfor %}
+          </div>
+        </form>
+      {% endif %}
+    </div>
+  {% endif %}
+{% endif %}
+
+{% if history %}
+  <h2>Verlauf</h2>
+  <table>
+    <thead><tr><th>Event</th><th>Zugewiesen</th><th>Frist</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for a in history %}
+      <tr><td>{{ a.ticket_request.event.name }}</td><td>{{ a.assigned_at|date:"D, d.m. H:i" }}</td>
+          <td>{{ a.deadline_at|date:"D, d.m. H:i" }}</td>
+          <td>{{ a.get_status_display }}{% if a.revoke_reason %} ({{ a.revoke_reason }}){% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+{% endif %}
+{% endblock %}
