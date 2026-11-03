@@ -115,3 +115,14 @@ Hier stehen Defaults und Auslegungen, die die Spezifikation offen lässt.
 - **Account löschen** ist nicht möglich, solange man einen Voucher hält (`assigned`,
   `redeemed`, `paid`). Wartelisten-Einträge werden mitgelöscht. AuditLog-Einträge bleiben,
   verlieren aber den Actor.
+
+## Betrieb
+
+- **Worker** ist eine einfache Shell-Schleife (`docker/worker.sh`) statt supercronic, also
+  keine zusätzliche Binary im Image. Ein fehlschlagender Job beendet die Schleife nicht.
+- **`purge_old_data`** löscht zusätzlich alle Mails, die älter als 90 Tage sind, auch ohne
+  Voucher-Bezug. Events und AuditLog bleiben erhalten (der AuditLog enthält nur IDs).
+- **Statische Dateien** liefert WhiteNoise mit gehashten Dateinamen aus. Migrationen und
+  `createcachetable` laufen beim Start des `web`-Containers.
+- **`VOUCHER_INBOX_ADDRESS`** ist eine zusätzliche Variable für die Adresse, die User im Shop
+  eintragen. Standard ist `IMAP_USER`.
