@@ -1,0 +1,79 @@
+{% extends "voucher/admin/base_admin.html" %}
+{% block title %}Slots – Orga{% endblock %}
+{% block admin_content %}
+<h1>Slots{% if event %} {{ event.name }}{% endif %}</h1>
+{% if event %}
+<div class="card">
+  <form method="post" action="{% url 'voucher:admin_action' %}" class="inline">{% csrf_token %}
+    <input type="hidden" name="op" value="auto_assign"><input type="hidden" name="event_id" value="{{ event.pk }}">
+    Automatische Zuweisung: <strong>{{ event.auto_assign|yesno:"an,aus" }}</strong>
+    <button name="enabled" value="{{ event.auto_assign|yesno:'0,1' }}" class="small secondary">{{ event.auto_assign|yesno:"Ausschalten,Einschalten" }}</button>
+  </form>
+  <form method="post" action="{% url 'voucher:admin_action' %}">{% csrf_token %}
+    <input type="hidden" name="op" value="create_voucher"><input type="hidden" name="event_id" value="{{ event.pk }}">
+    <label for="new-code">Start-Voucher anlegen</label>
+    <input type="text" id="new-code" name="code" autocomplete="off" required>
+    <button class="small">Anlegen</button>
+  </form>
+</div>
+
+<p class="filters">
+  <a href="?event={{ event.slug }}" class="{% if not show_all %}active{% endif %}">Im Umlauf</a>
+  <a href="?event={{ event.slug }}&all=1" class="{% if show_all %}active{% endif %}">Alle</a>
+</p>
+<table>
+  <thead><tr><th>Voucher</th><th>Quelle</th><th>Status</th><th>Halter</th><th>Zugewiesen</th><th>Frist</th><th>Letzte Aktion</th><th>Aktionen</th></tr></thead>
+  <tbody>
+  {% for row in rows %}{% with v=row.voucher a=row.assignment %}
+    <tr class="{% if row.alert %}alert{% endif %}">
+      <td>#{{ v.pk }}
+        <details><summary class="muted">Code</summary><span class="code">{{ v.code }}</span></details>
+        {% if v.parent_id %}<span class="muted">aus #{{ v.parent_id }}</span>{% endif %}
+      </td>
+      <td>{{ v.get_source_display }}</td>
+      <td><span class="badge">{{ v.get_status_display }}</span></td>
+      <td>{% if a %}{{ a.ticket_request.user.nickname }}{% if a.order_number %}<br><span class="muted">Best. {{ a.order_number }}</span>{% endif %}{% else %}–{% endif %}</td>
+      <td>{% if a %}{{ a.assigned_at|date:"D d.m. H:i" }}{% else %}–{% endif %}</td>
+      <td>{% if a %}{{ a.deadline_at|date:"D d.m. H:i" }}{% else %}–{% endif %}</td>
+      <td>{% if a %}vor {{ a.last_action_at|timesince }}{% else %}vor {{ v.received_at|timesince }}{% endif %}</td>
+      <td>
+        {% if a and v.status == "assigned" %}
+          <form method="post" action="{% url 'voucher:admin_action' %}" class="inline">{% csrf_token %}
+            <input type="hidden" name="assignment" value="{{ a.pk }}">
+            <input type="number" name="hours" value="12" min="1" class="short" aria-label="Stunden">
+            <button name="op" value="extend" class="small secondary">Frist +h</button>
+            <button name="op" value="revoke" class="small secondary" onclick="return confirm('Zuweisung aufheben?')">Aufheben</button>
+          </form>
+        {% endif %}
+        {% if v.status == "received" and open_requests %}
+          <form method="post" action="{% url 'voucher:admin_action' %}" class="inline">{% csrf_token %}
+            <input type="hidden" name="op" value="assign_to"><input type="hidden" name="voucher" value="{{ v.pk }}">
+            <select name="request" aria-label="Person">{% for r in open_requests %}<option value="{{ r.pk }}">{{ r.user.nickname }} ({{ r.get_status_display }})</option>{% endfor %}</select>
+            <button class="small">Zuweisen</button>
+          </form>
+        {% endif %}
+        <form method="post" action="{% url 'voucher:admin_action' %}" class="inline">{% csrf_token %}
+          <input type="hidden" name="voucher" value="{{ v.pk }}">
+          {% if v.status == "received" or v.status == "assigned" %}<button name="op" value="invalid" class="small danger" onclick="return confirm('Als ungültig markieren?')">Ungültig</button>{% endif %}
+          {% if v.status == "redeemed" or v.status == "paid" %}<button name="op" value="replicated" class="small secondary" onclick="return confirm('Ohne Folgevoucher als repliziert abschließen?')">Repliziert</button>{% endif %}
+        </form>
+        {% if v.source == "replicated" %}
+          <form method="post" action="{% url 'voucher:admin_action' %}" class="inline">{% csrf_token %}
+            <input type="hidden" name="op" value="reparent"><input type="hidden" name="voucher" value="{{ v.pk }}">
+            <select name="parent" aria-label="Elternvoucher"><option value="">– kein –</option>
+              {% for p in parent_candidates %}{% if p.pk != v.pk %}<option value="{{ p.pk }}" {% if p.pk == v.parent_id %}selected{% endif %}>#{{ p.pk }} ({{ p.get_status_display }})</option>{% endif %}{% endfor %}
+            </select>
+            <button class="small secondary">Eltern umhängen</button>
+          </form>
+        {% endif %}
+      </td>
+    </tr>
+  {% endwith %}{% empty %}
+    <tr><td colspan="8" class="muted">Keine Voucher.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+  <p>Noch kein Event angelegt.</p>
+{% endif %}
+{% endblock %}

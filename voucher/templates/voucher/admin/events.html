@@ -1,0 +1,20 @@
+{% extends "voucher/admin/base_admin.html" %}
+{% block title %}Events – Orga{% endblock %}
+{% block admin_content %}
+<h1>Events</h1>
+<p><a class="button" href="{% url 'voucher:admin_event_new' %}">Neues Event</a></p>
+<table>
+  <thead><tr><th>Name</th><th>Phase</th><th>Fristen</th><th>Bei verpasster Frist</th><th>Auto</th><th>Aktiv</th></tr></thead>
+  <tbody>
+  {% for e in events %}
+    <tr><td><a href="{% url 'voucher:admin_event_edit' e.pk %}">{{ e.name }}</a></td>
+      <td>{{ e.phase_start|date:"d.m.Y" }} – {{ e.phase_end|date:"d.m.Y" }}</td>
+      <td>Einlösen {{ e.redeem_deadline_hours }} h · Zahlung {{ e.pay_reminder_hours }} h</td>
+      <td>{{ e.get_missed_deadline_policy_display }}</td>
+      <td>{{ e.auto_assign|yesno:"an,aus" }}</td><td>{{ e.is_active|yesno:"ja," }}</td></tr>
+  {% empty %}
+    <tr><td colspan="6" class="muted">Noch keine Events.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "voucher/admin/base_admin.html" %}
+{% block title %}Freischaltung – Orga{% endblock %}
+{% block admin_content %}
+<h1>Freischaltung</h1>
+<h2>Warten auf Freischaltung</h2>
+<table>
+  <thead><tr><th>Nickname</th><th>E-Mail</th><th>Registriert</th><th></th></tr></thead>
+  <tbody>
+  {% for u in pending %}
+    <tr><td>{{ u.nickname }}</td><td>{{ u.email }}</td><td>{{ u.date_joined|date:"D d.m. H:i" }}</td>
+      <td><form method="post" action="{% url 'voucher:admin_action' %}">{% csrf_token %}
+        <input type="hidden" name="op" value="approve"><input type="hidden" name="user" value="{{ u.pk }}">
+        <button class="small">Freischalten</button></form></td></tr>
+  {% empty %}
+    <tr><td colspan="4" class="muted">Niemand wartet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+<p class="muted">{{ unverified }} Registrierung{{ unverified|pluralize:"en" }} mit noch unbestätigter E-Mail-Adresse.</p>
+
+<h2>Freigeschaltet</h2>
+<table>
+  <thead><tr><th>Nickname</th><th>E-Mail</th><th>Admin</th></tr></thead>
+  <tbody>{% for u in approved %}<tr><td>{{ u.nickname }}</td><td>{{ u.email }}</td><td>{{ u.is_staff|yesno:"ja," }}</td></tr>{% endfor %}</tbody>
+</table>
+{% endblock %}

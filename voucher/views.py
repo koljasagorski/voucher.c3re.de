@@ -1,10 +1,13 @@
 from django import forms
-from django.http import HttpResponse
-from django.shortcuts import render
-from django.views.decorators.http import require_http_methods
+from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.db.models import Q
+from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_http_methods, require_POST
 
-from . import services, tokens
-from .models import AuditLog, TicketRequest
+from . import notifications, services, tokens
+from .models import Assignment, AuditLog, TicketRequest, Voucher
 
 S = TicketRequest.Status
 
@@ -110,17 +113,93 @@ def action_link(request, token):
     return render(request, "voucher/action_result.html", {"done_text": meta["done"]})
 
 
-def dashboard(request):  # replaced by the user dashboard
-    return HttpResponse("")
+# --- user dashboard ----------------------------------------------------------------
 
 
-def admin_waitlist(request):  # replaced by the admin dashboard
-    return HttpResponse("")
+def _holder_buttons(ticket_request):
+    """Actions that fit the current state (same set as in the mails)."""
+    if ticket_request is None:
+        return []
+    if ticket_request.status == S.ASSIGNED:
+        return ["redeemed", "invalid", "withdraw"]
+    if ticket_request.status == S.REDEEMED:
+        return ["paid"]
+    if ticket_request.status in TicketRequest.OPEN_STATUSES:
+        return ["withdraw"]
+    return []
 
 
-def admin_slots(request):  # replaced by the admin dashboard
-    return HttpResponse("")
+@login_required
+def dashboard(request):
+    event = services.get_active_event()
+    ticket_request = assignment = None
+    ahead = 0
+    in_circulation = 0
+    if event:
+        ticket_request = TicketRequest.objects.filter(event=event, user=request.user).first()
+        in_circulation = event.vouchers.filter(status__in=Voucher.IN_CIRCULATION).count()
+        if ticket_request:
+            assignment = (
+                ticket_request.assignments.select_related("voucher").filter(status=Assignment.Status.ACTIVE).first()
+            )
+            ahead = (
+                TicketRequest.objects.filter(event=event, status=S.WAITING)
+                .filter(Q(position__lt=ticket_request.position) | Q(position=ticket_request.position, pk__lt=ticket_request.pk))
+                .count()
+            )
+    history = (
+        Assignment.objects.filter(ticket_request__user=request.user)
+        .select_related("ticket_request__event")
+        .order_by("-assigned_at")
+    )
+    buttons = [(name, HOLDER_ACTIONS[name]) for name in _holder_buttons(ticket_request)]
+    return render(
+        request,
+        "voucher/dashboard.html",
+        {
+            "event": event,
+            "ticket_request": ticket_request,
+            "assignment": assignment,
+            "ahead": ahead,
+            "in_circulation": in_circulation,
+            "history": history,
+            "buttons": buttons,
+            "can_join": event is not None and (ticket_request is None or ticket_request.status == S.WITHDRAWN),
+            "shop_url": settings.VOUCHER_SHOP_URL,
+            "inbox_address": settings.VOUCHER_INBOX_ADDRESS,
+            "deadline": notifications.fmt_datetime(assignment.deadline_at) if assignment else "",
+            "order_form": OrderNumberForm(),
+        },
+    )
 
 
-def admin_mail(request, pk):  # replaced by the admin dashboard
-    return HttpResponse("")
+@login_required
+@require_POST
+def dashboard_action(request):
+    action = request.POST.get("action", "")
+    event = services.get_active_event()
+    try:
+        if event is None:
+            raise services.InvalidTransition("Kein aktives Event")
+        if action == "join":
+            services.join_waitlist(event, request.user)
+            messages.success(request, "Du stehst jetzt auf der Warteliste.")
+            return redirect("voucher:dashboard")
+        ticket_request = get_object_or_404(TicketRequest, event=event, user=request.user)
+        if action not in _holder_buttons(ticket_request):
+            raise services.InvalidTransition("nichts zu tun")
+        assignment = ticket_request.assignments.filter(status=Assignment.Status.ACTIVE).first()
+        form = OrderNumberForm(request.POST)
+        order_number = form.cleaned_data["order_number"] if form.is_valid() else None
+        if assignment is None:
+            if action != "withdraw":
+                raise services.InvalidTransition("nichts zu tun")
+            services.withdraw(ticket_request, actor=request.user, via=AuditLog.Via.DASHBOARD)
+        else:
+            run_holder_action(
+                action, assignment, actor=request.user, via=AuditLog.Via.DASHBOARD, order_number=order_number
+            )
+        messages.success(request, HOLDER_ACTIONS[action]["done"])
+    except services.InvalidTransition:
+        messages.info(request, "Nichts zu tun – der Stand hat sich schon geändert.")
+    return redirect("voucher:dashboard")

@@ -1,0 +1,25 @@
+{% extends "voucher/admin/base_admin.html" %}
+{% block title %}Mail-Log – Orga{% endblock %}
+{% block admin_content %}
+<h1>Mail-Log</h1>
+<p class="filters">
+  <a href="?" class="{% if not status %}active{% endif %}">Alle</a>
+  {% for value, label in statuses %}<a href="?status={{ value }}" class="{% if status == value %}active{% endif %}">{{ label }}</a>{% endfor %}
+</p>
+<table>
+  <thead><tr><th>Eingang</th><th>Absender</th><th>Betreff</th><th>Status</th><th>Voucher</th></tr></thead>
+  <tbody>
+  {% for m in mails %}
+    <tr class="{% if m.parse_status == 'quarantine' or m.parse_status == 'no_code' %}alert{% endif %}">
+      <td><a href="{% url 'voucher:admin_mail' m.pk %}">{{ m.received_at|date:"D d.m. H:i" }}</a></td>
+      <td>{{ m.from_address }}</td>
+      <td>{{ m.subject }}</td>
+      <td><span class="badge">{{ m.get_parse_status_display }}</span></td>
+      <td>{% if m.voucher_id %}#{{ m.voucher_id }}{% else %}–{% endif %}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="5" class="muted">Keine Mails.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

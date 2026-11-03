@@ -1,0 +1,84 @@
+{% extends "voucher/admin/base_admin.html" %}
+{% load static %}
+{% block head %}<script src="{% static 'voucher/Sortable.min.js' %}" defer></script>{% endblock %}
+{% block title %}Warteliste – Orga{% endblock %}
+{% block admin_content %}
+<h1>Warteliste{% if event %} {{ event.name }}{% endif %}</h1>
+{% if not event %}
+  <p>Noch kein Event angelegt. <a href="{% url 'voucher:admin_event_new' %}">Event anlegen</a></p>
+{% else %}
+<p class="filters">
+  <a href="?event={{ event.slug }}&status=open" class="{% if status == 'open' %}active{% endif %}">Offen</a>
+  {% for value, label in statuses %}
+    <a href="?event={{ event.slug }}&status={{ value }}" class="{% if status == value %}active{% endif %}">{{ label }}{% for k, n in counts.items %}{% if k == value %} ({{ n }}){% endif %}{% endfor %}</a>
+  {% endfor %}
+  <a href="?event={{ event.slug }}&status=all" class="{% if status == 'all' %}active{% endif %}">Alle</a>
+  · <a href="{% url 'voucher:admin_export' %}?event={{ event.slug }}">CSV-Export</a>
+</p>
+{% if sortable %}<p class="muted">Reihenfolge per Drag-and-drop (≡) oder über das Positionsfeld ändern. <span id="reorder-status"></span></p>{% endif %}
+<table>
+  <thead><tr><th></th><th>#</th><th>Nickname</th><th>E-Mail</th><th>Status</th><th>Position</th><th>Notiz</th><th>Aktionen</th></tr></thead>
+  <tbody id="sortable" data-url="{% url 'voucher:admin_reorder' %}" data-event="{{ event.slug }}" data-csrf="{{ csrf_token }}">
+  {% for r in requests %}
+    <tr data-id="{{ r.pk }}">
+      <td>{% if sortable %}<span class="handle" title="Ziehen">≡</span>{% endif %}</td>
+      <td>{{ forloop.counter }}</td>
+      <td>{{ r.user.nickname }}</td>
+      <td class="muted">{{ r.user.email }}</td>
+      <td><span class="badge">{{ r.get_status_display }}</span></td>
+      <td>
+        {% if r.status == "waiting" or r.status == "paused" %}
+        <form method="post" action="{% url 'voucher:admin_action' %}" class="inline">{% csrf_token %}
+          <input type="hidden" name="op" value="move"><input type="hidden" name="request" value="{{ r.pk }}">
+          <input type="number" name="rank" value="{{ forloop.counter }}" min="1" class="short" aria-label="Neue Position">
+          <button class="small secondary">OK</button>
+        </form>
+        {% else %}{{ r.position }}{% endif %}
+      </td>
+      <td>{% include "voucher/admin/_note.html" %}</td>
+      <td>
+        {% if r.status == "waiting" or r.status == "paused" %}
+        <form method="post" action="{% url 'voucher:admin_action' %}" class="inline">{% csrf_token %}
+          <input type="hidden" name="request" value="{{ r.pk }}">
+          {% if r.status == "waiting" %}<button name="op" value="pause" class="small secondary">Pausieren</button>{% endif %}
+          {% if r.status == "paused" %}<button name="op" value="resume" class="small secondary">Fortsetzen</button>{% endif %}
+          <button name="op" value="skip" class="small secondary">Überspringen</button>
+        </form>
+        {% if free_vouchers %}
+        <form method="post" action="{% url 'voucher:admin_action' %}" class="inline">{% csrf_token %}
+          <input type="hidden" name="op" value="assign_to"><input type="hidden" name="request" value="{{ r.pk }}">
+          <select name="voucher" aria-label="Freier Voucher">{% for v in free_vouchers %}<option value="{{ v.pk }}">Voucher #{{ v.pk }}</option>{% endfor %}</select>
+          <button class="small">Zuweisen</button>
+        </form>
+        {% endif %}
+        {% endif %}
+      </td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="8" class="muted">Keine Einträge.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% if sortable %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  var el = document.getElementById("sortable");
+  if (!el || !window.Sortable) return;
+  Sortable.create(el, {
+    handle: ".handle",
+    animation: 150,
+    onEnd: function () {
+      var ids = Array.prototype.map.call(el.querySelectorAll("tr[data-id]"), function (row) { return row.dataset.id; });
+      htmx.ajax("POST", el.dataset.url, {
+        target: "#reorder-status",
+        swap: "innerHTML",
+        values: { ids: ids.join(","), event: el.dataset.event },
+        headers: { "X-CSRFToken": el.dataset.csrf }
+      });
+    }
+  });
+});
+</script>
+{% endif %}
+{% endif %}
+{% endblock %}
