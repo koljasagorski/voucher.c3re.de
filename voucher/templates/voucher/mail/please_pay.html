@@ -1,0 +1,8 @@
+{% extends "voucher/mail/base.html" %}
+{% block content %}
+<p>Hallo {{ user.nickname }},</p>
+{% if reminder %}<p><strong>Erinnerung:</strong> Deine Bestellung ist noch nicht als bezahlt markiert.</p>{% else %}<p>danke, dein Voucher ist als eingelöst markiert.</p>{% endif %}
+<p>Bitte bezahle deine Bestellung jetzt, am besten mit Kreditkarte. Der Folgevoucher entsteht erst, wenn die Bestellung bezahlt und mindestens 24 Stunden alt ist (Replikation nur Mo–Fr abends).</p>
+<p>Wenn du bezahlt hast, klicke auf „Bezahlt“. Auf der Seite kannst du optional deine Bestellnummer eintragen. Damit können wir den Folgevoucher eindeutig dir zuordnen.</p>
+<p>{% include "voucher/mail/_button.html" with url=links.paid label="Bezahlt" %}</p>
+{% endblock %}

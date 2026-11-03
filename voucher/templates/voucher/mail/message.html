@@ -1,0 +1,6 @@
+{% extends "voucher/mail/base.html" %}
+{% block content %}
+{% if greeting %}<p>{{ greeting }}</p>{% endif %}
+{% for p in paragraphs %}<p>{{ p }}</p>{% endfor %}
+{% if link %}<p>{% include "voucher/mail/_button.html" with url=link label=link_label secondary=True %}</p>{% endif %}
+{% endblock %}

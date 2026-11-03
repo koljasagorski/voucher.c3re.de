@@ -1,0 +1,25 @@
+{% autoescape off %}Hallo {{ user.nickname }},
+{% if reminder %}
+Erinnerung: Dein Voucher ist noch nicht als eingelöst markiert. Die Frist läuft bald ab.
+{% endif %}
+für {{ event.name }} ist ein Voucher für dich reserviert.
+
+  Code:  {{ voucher.code }}
+  Shop:  {{ shop_url }}
+  Frist: {{ deadline_long }}
+
+WICHTIG: Trage beim Einlösen {{ inbox_address }} als Empfängeradresse für den Folgevoucher ein.
+
+So geht's:
+1. Öffne den Shop und löse den Code ein.
+2. Gib als E-Mail-Adresse für den Folgevoucher {{ inbox_address }} an.
+3. Bezahle am besten mit Kreditkarte, damit die Zahlung sofort durch ist.
+4. Klicke danach auf „Eingelöst“.
+
+Der Folgevoucher entsteht erst, wenn deine Bestellung bezahlt und mindestens 24 Stunden alt ist.
+Der Ticketshop repliziert nur Mo–Fr abends.
+
+Eingelöst:                  {{ links.redeemed }}
+Voucher funktioniert nicht: {{ links.invalid }}
+Brauche kein Ticket mehr:   {{ links.withdraw }}
+{% endautoescape %}

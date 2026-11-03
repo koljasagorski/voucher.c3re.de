@@ -15,6 +15,20 @@ def _clear_cache():
     cache.clear()
 
 
+@pytest.fixture(autouse=True)
+def _send_mails_immediately(monkeypatch):
+    """Tests run inside a transaction that never commits, so on_commit would never fire."""
+    monkeypatch.setattr("voucher.notifications.defer", lambda fn: fn())
+
+
+@pytest.fixture
+def mails():
+    from django.core import mail
+
+    mail.outbox.clear()
+    return mail.outbox
+
+
 @pytest.fixture
 def event(db):
     now = timezone.now()

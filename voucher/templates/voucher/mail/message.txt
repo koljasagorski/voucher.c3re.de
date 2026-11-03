@@ -1,0 +1,6 @@
+{% autoescape off %}{% if greeting %}{{ greeting }}
+
+{% endif %}{% for p in paragraphs %}{{ p }}
+
+{% endfor %}{% if link %}{{ link_label }}: {{ link }}
+{% endif %}{% endautoescape %}
