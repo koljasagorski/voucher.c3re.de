@@ -1,0 +1,18 @@
+{% extends "voucher/base.html" %}
+{% block title %}{{ label }} – Voucher-Warteliste{% endblock %}
+{% block content %}
+<h1>{{ label }}</h1>
+<div class="card">
+  <p>{{ question }}</p>
+  <p class="muted">{{ event.name }} · {{ assignment.ticket_request.user.nickname }}</p>
+  <form method="post">
+    {% csrf_token %}
+    {% if form %}
+      <label for="id_order_number">Bestellnummer (optional)</label>
+      {{ form.order_number }}
+      <p class="muted">Steht in der Bestätigungsmail des Ticketshops. Hilft uns, den Folgevoucher dir zuzuordnen.</p>
+    {% endif %}
+    <div class="actions"><button type="submit" class="{% if danger %}danger{% endif %}">{{ button }}</button></div>
+  </form>
+</div>
+{% endblock %}

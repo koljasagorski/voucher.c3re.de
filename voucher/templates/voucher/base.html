@@ -1,0 +1,26 @@
+{% load static %}<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{% block title %}Voucher-Warteliste{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'voucher/style.css' %}">
+  <script src="{% static 'voucher/htmx.min.js' %}" defer></script>
+  {% block head %}{% endblock %}
+</head>
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+<header class="top">
+  <a class="brand" href="{% url 'voucher:dashboard' %}">Voucher-Warteliste</a>
+  <nav>
+    {% block nav %}{% endblock %}
+  </nav>
+</header>
+<main class="{% block main_class %}narrow{% endblock %}">
+  {% if messages %}
+    <ul class="messages">{% for message in messages %}<li class="{{ message.tags }}">{{ message }}</li>{% endfor %}</ul>
+  {% endif %}
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

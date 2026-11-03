@@ -1,0 +1,14 @@
+{% extends "voucher/base.html" %}
+{% block content %}
+{% if nothing_to_do %}
+  <h1>Nichts zu tun</h1>
+  <div class="card">
+    <p>Dieser Link ist nicht mehr gültig oder die Aktion wurde schon ausgeführt.</p>
+    <p class="muted">Den aktuellen Stand siehst du im <a href="{% url 'voucher:dashboard' %}">Dashboard</a>.</p>
+  </div>
+{% else %}
+  <h1>Erledigt</h1>
+  <div class="card"><p>{{ done_text }}</p>
+  <p class="muted"><a href="{% url 'voucher:dashboard' %}">Zum Dashboard</a></p></div>
+{% endif %}
+{% endblock %}
