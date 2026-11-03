@@ -74,6 +74,9 @@ Tests:
 python -m pytest
 ```
 
+GitHub Actions (`.github/workflows/tests.yml`) führt die Tests bei jedem Push und Pull
+Request gegen SQLite und PostgreSQL aus und baut das Docker-Image.
+
 Die Tests laufen standardmäßig gegen SQLite. Gegen PostgreSQL (empfohlen für den
 Nebenläufigkeitstest):
 
@@ -98,9 +101,13 @@ Dienste:
 - **db**: PostgreSQL 16, Daten im Volume `pgdata`.
 - **web**: führt beim Start `migrate` und `createcachetable` aus und startet dann gunicorn auf
   `127.0.0.1:8000`.
-- **worker**: einfache Schleife (`docker/worker.sh`). `fetch_mail` alle 5 Minuten,
-  `process_deadlines` alle 10 Minuten, `purge_old_data` täglich. Schlägt ein Job fehl, wird er
-  beim nächsten Durchlauf erneut versucht.
+- **worker**: einfache Schleife (`docker/worker.sh`). `fetch_mail` und `send_queued_mail`
+  alle 5 Minuten, `process_deadlines` alle 10 Minuten, `purge_old_data` täglich. Schlägt ein Job
+  fehl, wird er beim nächsten Durchlauf erneut versucht.
+
+Mails gehen über eine Warteschlange raus. Ist der SMTP-Server nicht erreichbar, geht keine
+Mail verloren: Der Worker versucht es alle 5 Minuten erneut (bis zu 24 Stunden), und im
+Orga-Bereich erscheint ein Hinweis.
 
 ### Reverse Proxy
 
@@ -223,6 +230,8 @@ Platzhalter.
 
 - Voucher-Codes sehen nur die zugewiesene Person (Dashboard und Mail) und Admins. Sie stehen
   nie in URLs oder im AuditLog. Ein Logging-Filter maskiert alles, was wie ein Code aussieht.
+- Die signierten Tokens aus Magic-Links und Aktionslinks werden im Access-Log und in
+  Fehlermeldungen durch `***` ersetzt.
 - Links in Mails ändern bei GET nichts. Erst der Button auf der Bestätigungsseite (POST) löst
   die Aktion aus, weil Mailclients und Scanner Links vorab aufrufen.
 - Keine Tracking-Scripte und keine externen Ressourcen.

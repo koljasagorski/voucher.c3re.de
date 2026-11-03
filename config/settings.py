@@ -69,6 +69,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "voucher.context_processors.outbox",
             ],
         },
     },
@@ -78,7 +79,7 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 DATABASES = {
     "default": dj_database_url.parse(
-        env("DATABASE_URL", f"sqlite:///{BASE_DIR / 'db.sqlite3'}"), conn_max_age=60
+        env("DATABASE_URL") or f"sqlite:///{BASE_DIR / 'db.sqlite3'}", conn_max_age=60
     )
 }
 if DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3":
@@ -180,4 +181,6 @@ LOGGING = {
         }
     },
     "root": {"handlers": ["console"], "level": env("LOG_LEVEL", "INFO")},
+    # Replace Django's default handlers (unfiltered) so request paths with tokens are masked too.
+    "loggers": {"django": {"handlers": ["console"], "level": "INFO", "propagate": False}},
 }

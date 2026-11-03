@@ -4,6 +4,8 @@ import logging
 import re
 
 VOUCHER_PARAM_RE = re.compile(r"(voucher=)[^&\s\"'<>]+", re.IGNORECASE)
+# Signed tokens in URL paths (action links, magic links, e-mail confirmation links).
+TOKEN_PATH_RE = re.compile(r"(/(?:a|konto/anmelden|konto/bestaetigen|konto/email-aendern)/)[^/\s?#\"'<>]+")
 MASK = "***"
 
 
@@ -18,6 +20,7 @@ def _code_regex():
 
 def mask_codes(text: str) -> str:
     text = VOUCHER_PARAM_RE.sub(r"\1" + MASK, text)
+    text = TOKEN_PATH_RE.sub(r"\1" + MASK, text)
     regex = _code_regex()
     if regex is not None:
         text = regex.sub(MASK, text)

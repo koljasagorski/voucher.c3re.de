@@ -126,3 +126,16 @@ Hier stehen Defaults und Auslegungen, die die Spezifikation offen lässt.
   `createcachetable` laufen beim Start des `web`-Containers.
 - **`VOUCHER_INBOX_ADDRESS`** ist eine zusätzliche Variable für die Adresse, die User im Shop
   eintragen. Standard ist `IMAP_USER`.
+- **Mail-Warteschlange (`OutgoingMail`):** Jede Mail wird in derselben Transaktion wie der
+  Zustandswechsel gespeichert und nach dem Commit sofort verschickt. Danach wird die Zeile
+  gelöscht, damit keine Codes in der DB liegen bleiben. Schlägt der Versand fehl, bleibt die
+  Zeile stehen, und `send_queued_mail` versucht es bei jedem Worker-Durchlauf erneut
+  (höchstens 288-mal, also etwa 24 h). Admins sehen im Orga-Bereich einen Hinweis, solange
+  Mails hängen. Unversendete Mails löscht `purge_old_data` nach 90 Tagen.
+- **Tokens in Logs:** Magic-Links, Aktionslinks und Bestätigungslinks enthalten signierte
+  Tokens im Pfad. Der Logging-Filter und der gunicorn-Logger
+  (`config.gunicorn_logger.MaskingLogger`) ersetzen sie im Access-Log, im Referer und in
+  Django-Fehlermeldungen durch `***`. Der `django`-Logger schreibt ausschließlich über den
+  maskierten Handler.
+- **CI:** GitHub Actions führt die Tests gegen SQLite und PostgreSQL 16 aus, prüft auf
+  fehlende Migrationen und baut das Docker-Image.
