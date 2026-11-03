@@ -52,6 +52,12 @@
         </form>
         {% endif %}
         {% endif %}
+        {% if r.status == "removed" %}
+        <form method="post" action="{% url 'voucher:admin_action' %}" class="inline">{% csrf_token %}
+          <input type="hidden" name="request" value="{{ r.pk }}">
+          <button name="op" value="reinstate" class="small secondary">Wieder aufnehmen (Listenende)</button>
+        </form>
+        {% endif %}
       </td>
     </tr>
   {% empty %}

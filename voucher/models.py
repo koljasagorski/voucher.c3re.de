@@ -176,6 +176,32 @@ class InboundMail(models.Model):
         return f"Mail #{self.pk} ({self.parse_status})"
 
 
+class OutgoingMail(models.Model):
+    """Outbox. A row exists only until the mail was handed to the SMTP server.
+
+    Rows are written in the same transaction as the state change that triggers the mail,
+    so a mail exists exactly when the change was committed. Sent rows are deleted at once
+    (bodies may contain voucher codes); failed rows are retried by the worker.
+    """
+
+    MAX_ATTEMPTS = 288  # one attempt per worker tick (5 min) -> about 24 h
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    recipients = models.JSONField()
+    subject = models.CharField(max_length=500)
+    body_text = models.TextField()
+    body_html = models.TextField(blank=True)
+    attempts = models.PositiveIntegerField(default=0)
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.CharField(max_length=500, blank=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+
+    def __str__(self):
+        return f"Mail #{self.pk} ({self.attempts} attempts)"
+
+
 class AuditLog(models.Model):
     class Via(models.TextChoices):
         DASHBOARD = "dashboard", "Dashboard"

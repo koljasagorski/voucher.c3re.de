@@ -199,6 +199,28 @@ def test_admin_approves_user(admin_client, make_user, mails):
     assert mails[-1].to == [pending.email]
 
 
+def test_admin_rejects_registration(admin_client, make_user, mails):
+    pending = make_user(approved=False)
+    approved = make_user()
+    url = reverse("voucher:admin_action")
+    admin_client.post(url, {"op": "reject", "user": pending.pk})
+    assert not User.objects.filter(pk=pending.pk).exists()
+    assert mails == []
+    # Approved accounts cannot be rejected this way.
+    admin_client.post(url, {"op": "reject", "user": approved.pk})
+    assert User.objects.filter(pk=approved.pk).exists()
+    assert AuditLog.objects.filter(action="reject").count() == 1
+
+
+def test_admin_reinstates_removed_person(admin_client, event, make_request):
+    removed = make_request(status=S.REMOVED)
+    html = admin_client.get(reverse("voucher:admin_waitlist") + "?status=removed").content.decode()
+    assert "Wieder aufnehmen" in html
+    admin_client.post(reverse("voucher:admin_action"), {"op": "reinstate", "request": removed.pk})
+    removed.refresh_from_db()
+    assert removed.status == S.WAITING
+
+
 def test_admin_enters_code_for_quarantined_mail(admin_client, event, make_request):
     make_request()
     raw = (

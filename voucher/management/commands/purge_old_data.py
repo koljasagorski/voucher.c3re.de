@@ -6,7 +6,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from voucher.models import Event, InboundMail, TicketRequest, Voucher
+from voucher.models import Event, InboundMail, OutgoingMail, TicketRequest, Voucher
 from voucher.services import audit
 
 
@@ -26,6 +26,8 @@ class Command(BaseCommand):
             ).delete()
             _, vouchers = Voucher.objects.filter(event__in=events).delete()  # cascades to assignments
             _, requests = TicketRequest.objects.filter(event__in=events).delete()
+            # Mails that never went out (may contain codes) are not kept forever either.
+            OutgoingMail.objects.filter(created_at__lt=cutoff).delete()
             for event in events:
                 audit("purge", event)
         self.stdout.write(

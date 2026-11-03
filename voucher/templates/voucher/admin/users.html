@@ -9,8 +9,9 @@
   {% for u in pending %}
     <tr><td>{{ u.nickname }}</td><td>{{ u.email }}</td><td>{{ u.date_joined|date:"D d.m. H:i" }}</td>
       <td><form method="post" action="{% url 'voucher:admin_action' %}">{% csrf_token %}
-        <input type="hidden" name="op" value="approve"><input type="hidden" name="user" value="{{ u.pk }}">
-        <button class="small">Freischalten</button></form></td></tr>
+        <input type="hidden" name="user" value="{{ u.pk }}">
+        <button name="op" value="approve" class="small">Freischalten</button>
+        <button name="op" value="reject" class="small danger" onclick="return confirm('Registrierung löschen?')">Ablehnen</button></form></td></tr>
   {% empty %}
     <tr><td colspan="4" class="muted">Niemand wartet.</td></tr>
   {% endfor %}

@@ -74,6 +74,9 @@ Tests:
 python -m pytest
 ```
 
+GitHub Actions (`.github/workflows/tests.yml`) führt die Tests bei jedem Push und Pull
+Request gegen SQLite und PostgreSQL aus und baut das Docker-Image.
+
 Die Tests laufen standardmäßig gegen SQLite. Gegen PostgreSQL (empfohlen für den
 Nebenläufigkeitstest):
 
@@ -98,9 +101,36 @@ Dienste:
 - **db**: PostgreSQL 16, Daten im Volume `pgdata`.
 - **web**: führt beim Start `migrate` und `createcachetable` aus und startet dann gunicorn auf
   `127.0.0.1:8000`.
-- **worker**: einfache Schleife (`docker/worker.sh`). `fetch_mail` alle 5 Minuten,
-  `process_deadlines` alle 10 Minuten, `purge_old_data` täglich. Schlägt ein Job fehl, wird er
-  beim nächsten Durchlauf erneut versucht.
+- **backup**: täglicher `pg_dump` nach `./backups/` (siehe unten).
+- **worker**: einfache Schleife (`docker/worker.sh`). `fetch_mail` und `send_queued_mail`
+  alle 5 Minuten, `process_deadlines` alle 10 Minuten, `purge_old_data` täglich. Schlägt ein Job
+  fehl, wird er beim nächsten Durchlauf erneut versucht.
+
+Mails gehen über eine Warteschlange raus. Ist der SMTP-Server nicht erreichbar, geht keine
+Mail verloren: Der Worker versucht es alle 5 Minuten erneut (bis zu 24 Stunden), und im
+Orga-Bereich erscheint ein Hinweis.
+
+### Backups
+
+Der Dienst **backup** schreibt einmal täglich einen Dump der Datenbank nach `./backups/`
+(`voucher-JJJJMMTT-HHMM.dump`, pg_dump-Custom-Format) und löscht Dumps nach 14 Tagen
+(`BACKUP_KEEP_DAYS` in `.env`). Die Dumps enthalten Voucher-Codes und E-Mail-Adressen:
+das Verzeichnis nur für Admins lesbar halten und, wenn möglich, zusätzlich verschlüsselt auf
+einen anderen Rechner kopieren.
+
+Wiederherstellen:
+
+```bash
+docker compose stop web worker
+```
+
+```bash
+docker compose exec -T db pg_restore --clean --if-exists -U voucher -d voucher < backups/voucher-20261224-0300.dump
+```
+
+```bash
+docker compose start web worker
+```
 
 ### Reverse Proxy
 
@@ -138,6 +168,9 @@ das Django-Admin unter `/django-admin/`, ebenfalls nur mit OTP.
 
 Normale User melden sich ohne Passwort per Magic-Link unter `/konto/anmelden/` an. Nach der
 Registrierung und der Bestätigung ihrer Adresse erscheinen sie unter *Orga → Freischaltung*.
+Dort können Admins sie freischalten oder ablehnen (die Registrierung wird dann gelöscht).
+Wer wegen einer verpassten Frist entfernt wurde, lässt sich in der Warteliste (Filter
+„Entfernt“) wieder aufnehmen – am Listenende.
 
 ## Postfach einrichten
 
@@ -223,6 +256,8 @@ Platzhalter.
 
 - Voucher-Codes sehen nur die zugewiesene Person (Dashboard und Mail) und Admins. Sie stehen
   nie in URLs oder im AuditLog. Ein Logging-Filter maskiert alles, was wie ein Code aussieht.
+- Die signierten Tokens aus Magic-Links und Aktionslinks werden im Access-Log und in
+  Fehlermeldungen durch `***` ersetzt.
 - Links in Mails ändern bei GET nichts. Erst der Button auf der Bestätigungsseite (POST) löst
   die Aktion aus, weil Mailclients und Scanner Links vorab aufrufen.
 - Keine Tracking-Scripte und keine externen Ressourcen.

@@ -45,9 +45,50 @@ def send_mail(to, subject, template, context):
     with translation.override("de"):
         text = render_to_string(f"voucher/mail/{template}.txt", context)
         html = render_to_string(f"voucher/mail/{template}.html", context)
-    message = EmailMultiAlternatives(subject, text, settings.DEFAULT_FROM_EMAIL, recipients)
-    message.attach_alternative(html, "text/html")
-    defer(lambda: message.send())
+    from .models import OutgoingMail
+
+    queued = OutgoingMail.objects.create(recipients=recipients, subject=subject, body_text=text, body_html=html)
+    defer(lambda: deliver(queued.pk))
+
+
+def deliver(pk):
+    """Try to send one queued mail. Deletes it on success; records the error otherwise."""
+    from .logging import mask_codes
+    from .models import OutgoingMail
+
+    with transaction.atomic():
+        # skip_locked: the web process and the worker never send the same row twice.
+        mail = OutgoingMail.objects.select_for_update(skip_locked=True).filter(pk=pk).first()
+        if mail is None:
+            return False
+        message = EmailMultiAlternatives(mail.subject, mail.body_text, settings.DEFAULT_FROM_EMAIL, mail.recipients)
+        if mail.body_html:
+            message.attach_alternative(mail.body_html, "text/html")
+        try:
+            message.send(fail_silently=False)
+        except Exception as exc:  # SMTP errors, timeouts, DNS ...
+            mail.attempts += 1
+            mail.last_attempt_at = timezone.now()
+            mail.last_error = mask_codes(f"{type(exc).__name__}: {exc}")[:500]
+            mail.save(update_fields=["attempts", "last_attempt_at", "last_error"])
+            logger.warning("Sending mail %s failed (attempt %s): %s", mail.pk, mail.attempts, mail.last_error)
+            return False
+        mail.delete()
+    return True
+
+
+def retry_queued(min_age_seconds=60):
+    """Retry unsent mails (called by the worker). Fresh rows are left to the web process."""
+    from datetime import timedelta
+
+    from .models import OutgoingMail
+
+    cutoff = timezone.now() - timedelta(seconds=min_age_seconds)
+    pks = OutgoingMail.objects.filter(
+        created_at__lte=cutoff, attempts__lt=OutgoingMail.MAX_ATTEMPTS
+    ).values_list("pk", flat=True)
+    results = [deliver(pk) for pk in list(pks)]
+    return {"sent": results.count(True), "failed": results.count(False)}
 
 
 def _subject(event, text):
