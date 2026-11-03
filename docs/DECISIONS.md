@@ -63,3 +63,27 @@ Hier stehen Defaults und Auslegungen, die die Spezifikation offen lässt.
 - **Admin-Mails** gehen an `ADMIN_EMAILS`. Ist die Liste leer, gehen sie an alle aktiven
   Staff-User. Sie enthalten nie Voucher-Codes, nur Voucher-IDs und einen Link ins Dashboard.
 - Kurze Mails ohne Code und ohne Buttons teilen sich eine Vorlage (`mail/message.*`).
+
+## Mail-Eingang
+
+- **Reihenfolge der Prüfungen:** Message-ID schon bekannt → überspringen (nichts
+  gespeichert). Danach Absender (`rejected_sender`), Echtheit (`quarantine`), Code-Suche
+  (`no_code`), bekannter Code (`duplicate`). Erst dann `register_replicated_voucher`.
+- **Echtheit (Härtung über die Spezifikation hinaus):** Nur der *erste*
+  `Authentication-Results`-Header mit unserer `VOUCHER_AUTHSERV_ID` zählt. Unser MTA setzt
+  ihn oben drauf, tiefer liegende (fremde oder gefälschte) Header werden ignoriert.
+  `dkim=pass` zählt nur, wenn `header.d` zur From-Domain passt (gleich oder Sub-/Oberdomain),
+  `spf=pass` nur, wenn `smtp.mailfrom` passt. Sonst könnte jemand mit einer gültigen
+  DKIM-Signatur seiner eigenen Domain und gefälschtem From einen Code einschleusen.
+  Ist `VOUCHER_AUTHSERV_ID` leer, geht alles in Quarantäne.
+- **Mehrere verschiedene Codes** in einer Mail → Quarantäne (der Admin wählt).
+- **Kein aktives Event** → Quarantäne mit Notiz.
+- `rejected_sender` löst keine Admin-Mail aus (sonst Spam an die Admins). Die Mail steht
+  trotzdem im Mail-Log.
+- Die Rohmail wird gespeichert (nur Admins sehen sie). Mails werden erst als gelesen
+  markiert, wenn sie gespeichert sind.
+- **Default `VOUCHER_CODE_REGEX`:** `\b[A-Z0-9]{16}\b` (pretix-Standard: 16 Zeichen,
+  Großbuchstaben und Ziffern). Hat die Regex eine Gruppe, zählt Gruppe 1.
+- **Fixtures:** Jede `tests/fixtures/mails/<name>.eml` braucht eine `<name>.json` mit dem
+  erwarteten `parse_status`, `code` und optional `order_number`. Der Test läuft automatisch
+  über alle Dateien.
