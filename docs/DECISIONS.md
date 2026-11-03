@@ -139,3 +139,10 @@ Hier stehen Defaults und Auslegungen, die die Spezifikation offen lässt.
   maskierten Handler.
 - **CI:** GitHub Actions führt die Tests gegen SQLite und PostgreSQL 16 aus, prüft auf
   fehlende Migrationen und baut das Docker-Image.
+- **Wieder aufnehmen:** Admins können entfernte Personen (`removed`) wieder auf die Liste
+  setzen. Sie landen am Listenende, wie beim Eintragen.
+- **Registrierung ablehnen:** Löscht einen nicht freigeschalteten, nicht-Admin-Account samt
+  Einträgen. Es geht keine Mail raus, damit Spam-Adressen keine Post bekommen.
+- **Backups:** Ein eigener Compose-Dienst (`postgres:16`-Image, `docker/backup.sh`) erstellt
+  täglich `pg_dump`-Dateien in `./backups/` und hebt sie 14 Tage auf. Das ist kürzer als die
+  90-Tage-Frist von `purge_old_data`, damit gelöschte Daten nicht lange in Backups weiterleben.

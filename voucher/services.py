@@ -118,6 +118,20 @@ def resume(request, *, actor=None, via=Via.ADMIN):
     return request
 
 
+def reinstate(request, *, actor=None, via=Via.ADMIN):
+    """Admin puts a removed person back on the list (at the end)."""
+    with transaction.atomic():
+        event = _lock_event(request.event)
+        request = TicketRequest.objects.select_for_update().get(pk=request.pk)
+        _require(request.status == S.REMOVED)
+        request.status = S.WAITING
+        request.position = _end_position(event)
+        request.save(update_fields=["status", "position", "updated_at"])
+        audit("reinstate", request, actor=actor, via=via, position=request.position)
+        assign_free_vouchers(event)
+    return request
+
+
 def skip(request, *, actor=None, via=Via.ADMIN):
     """Move a person one place back, behind the next open (waiting/paused) entry."""
     with transaction.atomic():

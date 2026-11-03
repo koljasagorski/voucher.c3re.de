@@ -145,6 +145,20 @@ def test_pause_resume(make_request, make_voucher):
     assert request.status == S.ASSIGNED  # free voucher handed out on resume
 
 
+def test_reinstate_removed_person_at_end_of_list(make_request, make_voucher):
+    removed = make_request(status=S.REMOVED, position=1)
+    make_request(position=5)
+    voucher = make_voucher()
+    services.assign_next(voucher)  # goes to the waiting person, not to the removed one
+
+    services.reinstate(removed)
+    refresh(removed)
+    assert removed.status == S.WAITING
+    assert removed.position == 6
+    with pytest.raises(InvalidTransition):
+        services.reinstate(removed)
+
+
 def test_reorder_and_move_and_skip(event, make_request):
     a, b, c = make_request(), make_request(), make_request()
     services.reorder(event, [c.pk, a.pk, b.pk])

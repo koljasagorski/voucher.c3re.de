@@ -197,10 +197,12 @@ def action(request):
     op = request.POST.get("op", "")
     actor = request.user
     try:
-        if op in ("pause", "resume", "skip", "move", "assign_to"):
+        if op in ("pause", "resume", "skip", "move", "assign_to", "reinstate"):
             ticket_request = get_object_or_404(TicketRequest, pk=_int(request, "request"))
             if op == "pause":
                 services.pause(ticket_request, actor=actor)
+            elif op == "reinstate":
+                services.reinstate(ticket_request, actor=actor)
             elif op == "resume":
                 services.resume(ticket_request, actor=actor)
             elif op == "skip":
@@ -246,6 +248,13 @@ def action(request):
             user.save(update_fields=["approved"])
             services.audit("approve", user, actor=actor, via=Via.ADMIN)
             account_mails.approved(user)
+        elif op == "reject":
+            # Remove a registration that was never approved (e.g. spam). No mail is sent.
+            user = get_object_or_404(User, pk=_int(request, "user"))
+            if user.approved or user.is_staff:
+                raise services.InvalidTransition("nur nicht freigeschaltete Registrierungen")
+            services.audit("reject", user, actor=actor, via=Via.ADMIN)
+            user.delete()
         else:
             raise services.InvalidTransition("Unbekannte Aktion")
     except services.InvalidTransition as exc:
