@@ -22,6 +22,14 @@ class Event(models.Model):
         default=MissedDeadlinePolicy.END_OF_LIST,
     )
     is_active = models.BooleanField("Aktiv", default=False)
+    lottery_at = models.DateTimeField(
+        "Auslosung am",
+        null=True,
+        blank=True,
+        help_text="Optional. Alle, die sich bis zu diesem Zeitpunkt eintragen, werden einmal zufällig "
+        "gereiht. Bis dahin werden keine Voucher automatisch zugewiesen.",
+    )
+    lottery_done_at = models.DateTimeField("Ausgelost am", null=True, blank=True)
 
     class Meta:
         ordering = ["-phase_start"]
@@ -33,6 +41,10 @@ class Event(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def lottery_pending(self):
+        return self.lottery_at is not None and self.lottery_done_at is None
 
 
 class TicketRequest(models.Model):

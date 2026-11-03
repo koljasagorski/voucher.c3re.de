@@ -15,6 +15,18 @@
   <a href="?event={{ event.slug }}&status=all" class="{% if status == 'all' %}active{% endif %}">Alle</a>
   · <a href="{% url 'voucher:admin_export' %}?event={{ event.slug }}">CSV-Export</a>
 </p>
+{% if event.lottery_pending %}
+<div class="card important">
+  Auslosung am {{ event.lottery_at|date:"D, d.m.Y H:i" }}: Alle, die sich bis dahin eintragen, werden zufällig gereiht.
+  Bis dahin werden keine Voucher automatisch zugewiesen.
+  <form method="post" action="{% url 'voucher:admin_action' %}" class="inline">{% csrf_token %}
+    <input type="hidden" name="op" value="lottery"><input type="hidden" name="event_id" value="{{ event.pk }}">
+    <button class="small" onclick="return confirm('Jetzt auslosen? Das geht nur einmal.')">Jetzt auslosen</button>
+  </form>
+</div>
+{% elif event.lottery_done_at %}
+<p class="muted">Ausgelost am {{ event.lottery_done_at|date:"D, d.m.Y H:i" }}.</p>
+{% endif %}
 {% if sortable %}<p class="muted">Reihenfolge per Drag-and-drop (≡) oder über das Positionsfeld ändern. <span id="reorder-status"></span></p>{% endif %}
 <table>
   <thead><tr><th></th><th>#</th><th>Nickname</th><th>E-Mail</th><th>Status</th><th>Position</th><th>Notiz</th><th>Aktionen</th></tr></thead>

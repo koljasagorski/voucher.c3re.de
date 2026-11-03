@@ -232,7 +232,8 @@ def invalid_confirmation(assignment):
         "Voucher als ungültig gemeldet – du bleibst vorne",
         [
             "danke für die Meldung. Der Voucher ist als ungültig markiert und die Admins sind informiert.",
-            "Du behältst deinen Platz auf der Warteliste und bekommst den nächsten freien Voucher.",
+            "Du behältst deinen Platz auf der Warteliste. Ein Admin prüft die Meldung und gibt "
+            "dich danach wieder frei – dann bekommst du den nächsten freien Voucher.",
         ],
     )
 

@@ -221,7 +221,7 @@ def test_pay_before_redeem_is_invalid(make_request, make_voucher):
     assert request.status == S.ASSIGNED
 
 
-def test_report_invalid_keeps_position_and_alerts_admins(make_request, make_voucher, mails):
+def test_report_invalid_keeps_position_pauses_and_alerts_admins(make_request, make_voucher, mails):
     assignment, voucher, request = assign(make_request, make_voucher, position=3)
     second = make_voucher()
     mails.clear()
@@ -231,12 +231,17 @@ def test_report_invalid_keeps_position_and_alerts_admins(make_request, make_vouc
     assert voucher.status == VS.INVALID
     assert assignment.status == AS.REVOKED and assignment.revoke_reason == "invalid"
     assert request.position == 3
-    # The free second voucher goes to the same person right away.
-    assert request.status == S.ASSIGNED
-    assert second.status == VS.ASSIGNED
+    # Paused until an admin checks the report: no further code is handed out automatically.
+    assert request.status == S.PAUSED
+    assert second.status == VS.RECEIVED
     admin_mails = [m for m in mails if m.to == ["orga@example.de"]]
     assert len(admin_mails) == 1
     assert voucher.code not in admin_mails[0].body
+
+    services.resume(request)  # admin resumes -> keeps the old position, gets the free voucher
+    refresh(request, second)
+    assert request.status == S.ASSIGNED
+    assert second.status == VS.ASSIGNED
 
 
 def test_withdraw_waiting(make_request):

@@ -7,7 +7,7 @@ Zustand passt, wirft `InvalidTransition` und ändert nichts.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> waiting: join_waitlist (Listenende)
+    [*] --> waiting: join_waitlist (Listenende; vor der Auslosung noch keine Zuweisung)
     waiting --> assigned: assign_next / assign_to
     paused --> assigned: assign_to (Admin)
     waiting --> paused: pause (Admin)
@@ -16,7 +16,7 @@ stateDiagram-v2
     redeemed --> paid: mark_paid („Bezahlt“)
     paid --> completed: register_replicated_voucher / mark_voucher_replicated
     redeemed --> completed: Folgevoucher per Bestellnummer / Admin
-    assigned --> waiting: report_invalid (Position bleibt)
+    assigned --> paused: report_invalid (Position bleibt, Admin setzt fort)
     assigned --> waiting: Frist abgelaufen, Policy end_of_list (Listenende)
     assigned --> removed: Frist abgelaufen, Policy remove
     assigned --> paused: revoke (Admin)

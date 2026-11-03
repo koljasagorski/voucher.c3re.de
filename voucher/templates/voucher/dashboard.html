@@ -10,6 +10,7 @@
   {% if can_join %}
     <div class="card">
       <p>Du stehst noch nicht auf der Warteliste.</p>
+      {% if event.lottery_pending %}<p>Die Reihenfolge wird am {{ event.lottery_at|date:"D, d.m.Y H:i" }} unter allen ausgelost, die sich bis dahin eintragen.</p>{% endif %}
       <form method="post" action="{% url 'voucher:dashboard_action' %}">{% csrf_token %}
         <button name="action" value="join">Ich möchte ein Ticket</button>
       </form>
@@ -17,7 +18,10 @@
   {% else %}
     <div class="card">
       <p>Status: <strong>{{ ticket_request.get_status_display }}</strong></p>
-      {% if ticket_request.status == "waiting" %}
+      {% if ticket_request.status == "waiting" and event.lottery_pending %}
+        <p>Die Reihenfolge wird am <strong>{{ event.lottery_at|date:"D, d.m.Y H:i" }}</strong> ausgelost.
+        Alle, die sich bis dahin eintragen, haben die gleiche Chance.</p>
+      {% elif ticket_request.status == "waiting" %}
         <p>Vor dir warten <strong>{{ ahead }}</strong> Person{{ ahead|pluralize:"en" }}.</p>
       {% elif ticket_request.status == "paused" %}
         <p>Dein Platz ist pausiert. Du bekommst gerade keinen Voucher. Bei Fragen wende dich an die Admins.</p>

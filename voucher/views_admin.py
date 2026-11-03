@@ -231,6 +231,10 @@ def action(request):
         elif op == "create_voucher":
             event = get_object_or_404(Event, pk=_int(request, "event_id"))
             services.create_voucher(event, request.POST.get("code", ""), actor=actor)
+        elif op == "lottery":
+            event = get_object_or_404(Event, pk=_int(request, "event_id"))
+            drawn = services.run_lottery(event, actor=actor, via=Via.ADMIN)
+            messages.info(request, f"{len(drawn)} Einträge ausgelost.")
         elif op == "auto_assign":
             event = get_object_or_404(Event, pk=_int(request, "event_id"))
             services.set_auto_assign(event, request.POST.get("enabled") == "1", actor=actor)
@@ -337,11 +341,13 @@ class EventForm(forms.ModelForm):
             "pay_reminder_hours",
             "auto_assign",
             "missed_deadline_policy",
+            "lottery_at",
             "is_active",
         ]
         widgets = {
             "phase_start": forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
             "phase_end": forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
+            "lottery_at": forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
         }
 
     def _get_validation_exclusions(self):

@@ -36,22 +36,18 @@ def test_rate_limit_window_survives_db_cache():
     assert expires_at > timezone.now() + timedelta(minutes=55)
 
 
-def test_second_invalid_report_pauses_the_person(make_request, make_voucher, mails):
+def test_invalid_report_cannot_be_used_to_collect_codes(make_request, make_voucher, mails):
     request = make_request()
     first = services.assign_next(make_voucher())
     make_voucher()
     make_voucher()
 
-    services.report_invalid(first)  # first report: back to waiting, gets the next voucher
-    request.refresh_from_db()
-    assert request.status == S.ASSIGNED
-    second = request.assignments.get(status=Assignment.Status.ACTIVE)
-
-    services.report_invalid(second)  # second report: paused, no further voucher
+    services.report_invalid(first)
     request.refresh_from_db()
     assert request.status == S.PAUSED
-    assert Voucher.objects.filter(status=Voucher.Status.RECEIVED).count() == 1
-    assert "zweite Meldung" in mails[-1].body
+    assert not request.assignments.filter(status=Assignment.Status.ACTIVE).exists()
+    assert Voucher.objects.filter(status=Voucher.Status.RECEIVED).count() == 2
+    assert "fortsetzen" in mails[-1].body
 
 
 def test_stale_parent_is_not_completed_twice(make_request, make_voucher, monkeypatch):
