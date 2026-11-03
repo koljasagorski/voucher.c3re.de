@@ -353,12 +353,17 @@ def report_invalid(assignment, *, actor=None, via=Via.DASHBOARD):
     with transaction.atomic():
         assignment, voucher, request = _lock_assignment(assignment)
         _require(assignment.status == AS.ACTIVE and request.status == S.ASSIGNED)
+        # A second report by the same person pauses them: otherwise one person could
+        # collect code after code by reporting each one as "not working".
+        repeated = Assignment.objects.filter(
+            ticket_request=request, status=AS.REVOKED, revoke_reason="invalid"
+        ).exists()
         assignment.status = AS.REVOKED
         assignment.revoke_reason = "invalid"
         assignment.save(update_fields=["status", "revoke_reason"])
         _set_status(voucher, VS.INVALID)
-        _set_status(request, S.WAITING)  # position stays unchanged
-        audit("report_invalid", assignment, actor=actor, via=via, voucher_id=voucher.pk)
+        _set_status(request, S.PAUSED if repeated else S.WAITING)  # position stays unchanged
+        audit("report_invalid", assignment, actor=actor, via=via, voucher_id=voucher.pk, paused=repeated)
         notifications.invalid_confirmation(assignment)
         notifications.admin_alert(
             request.event,
@@ -366,7 +371,10 @@ def report_invalid(assignment, *, actor=None, via=Via.DASHBOARD):
             [
                 f"{request.user.nickname} meldet, dass Voucher #{voucher.pk} nicht funktioniert "
                 "(z. B. weil der Käufer des Vorgängers ihn selbst eingelöst hat).",
-                "Der Voucher ist als ungültig markiert, die Person wartet wieder auf ihrer alten Position.",
+                "Das ist schon die zweite Meldung dieser Person. Sie ist deshalb pausiert und bekommt "
+                "erst wieder einen Voucher, wenn ein Admin sie fortsetzt."
+                if repeated
+                else "Der Voucher ist als ungültig markiert, die Person wartet wieder auf ihrer alten Position.",
             ],
         )
         assign_free_vouchers(request.event)
@@ -376,13 +384,17 @@ def report_invalid(assignment, *, actor=None, via=Via.DASHBOARD):
 def withdraw(request, *, actor=None, via=Via.DASHBOARD):
     """User does not need a ticket anymore."""
     with transaction.atomic():
-        request = TicketRequest.objects.select_for_update().get(pk=request.pk)
-        _require(request.status in (S.WAITING, S.PAUSED, S.ASSIGNED))
         freed = None
-        active = request.assignments.filter(status=AS.ACTIVE).first()
-        if active is not None:
+        active = Assignment.objects.filter(ticket_request_id=request.pk, status=AS.ACTIVE).first()
+        if active is None:
+            request = TicketRequest.objects.select_for_update().get(pk=request.pk)
+            _require(request.status in (S.WAITING, S.PAUSED))
+        else:
+            # Same lock order as everywhere else (voucher, request, assignment): no deadlocks.
             active, voucher, request = _lock_assignment(active)
-            _require(request.status == S.ASSIGNED and voucher.status == VS.ASSIGNED)
+            _require(
+                active.status == AS.ACTIVE and request.status == S.ASSIGNED and voucher.status == VS.ASSIGNED
+            )
             active.status = AS.REVOKED
             active.revoke_reason = "withdrawn"
             active.save(update_fields=["status", "revoke_reason"])
@@ -462,12 +474,26 @@ def mark_voucher_replicated(voucher, *, actor=None, via=Via.ADMIN):
     return voucher
 
 
-def _find_parent_assignment(event, search_text):
+def _lock_parent_assignment(event, search_text):
+    """Find the parent link and lock it; re-check after locking (it may just have been closed)."""
+    excluded = []
+    for _ in range(5):
+        candidate = _find_parent_assignment(event, search_text, exclude=excluded)
+        if candidate is None:
+            return None
+        locked, voucher, request = _lock_assignment(candidate)
+        if locked.status == AS.ACTIVE and request.status in (S.REDEEMED, S.PAID):
+            return locked
+        excluded.append(candidate.pk)
+    return None
+
+
+def _find_parent_assignment(event, search_text, exclude=()):
     candidates = Assignment.objects.select_related("voucher", "ticket_request").filter(
         ticket_request__event=event,
         status=AS.ACTIVE,
         ticket_request__status__in=(S.REDEEMED, S.PAID),
-    )
+    ).exclude(pk__in=exclude)
     if search_text:
         for assignment in candidates.exclude(order_number=""):
             pattern = r"(?<![A-Za-z0-9])" + re.escape(assignment.order_number) + r"(?![A-Za-z0-9])"
@@ -484,7 +510,7 @@ def register_replicated_voucher(code, inbound_mail=None, *, event=None, search_t
     _require(event is not None, "Kein aktives Event")
     with transaction.atomic():
         _require(not Voucher.objects.filter(code=code).exists(), "Code ist schon bekannt")
-        parent_assignment = _find_parent_assignment(event, search_text)
+        parent_assignment = _lock_parent_assignment(event, search_text)
         voucher = Voucher.objects.create(
             event=event,
             code=code,
@@ -502,8 +528,13 @@ def register_replicated_voucher(code, inbound_mail=None, *, event=None, search_t
             inbound_mail_id=getattr(inbound_mail, "pk", None),
         )
         if parent_assignment is not None:
-            locked, parent_voucher, parent_request = _lock_assignment(parent_assignment)
-            _complete(locked, parent_voucher, parent_request, actor=actor, via=via)
+            _complete(
+                parent_assignment,
+                parent_assignment.voucher,
+                parent_assignment.ticket_request,
+                actor=actor,
+                via=via,
+            )
         if inbound_mail is not None:
             inbound_mail.voucher = voucher
             inbound_mail.parse_status = InboundMail.ParseStatus.PARSED

@@ -146,3 +146,20 @@ Hier stehen Defaults und Auslegungen, die die Spezifikation offen lässt.
 - **Backups:** Ein eigener Compose-Dienst (`postgres:16`-Image, `docker/backup.sh`) erstellt
   täglich `pg_dump`-Dateien in `./backups/` und hebt sie 14 Tage auf. Das ist kürzer als die
   90-Tage-Frist von `purge_old_data`, damit gelöschte Daten nicht lange in Backups weiterleben.
+
+## Nach dem unabhängigen Review
+
+- **„Voucher funktioniert nicht“ mehrfach (Abweichung von der Spezifikation):** Die erste
+  Meldung setzt die Person wie spezifiziert zurück auf `waiting` mit unveränderter Position.
+  Ab der zweiten Meldung derselben Person wird sie `paused` und bekommt erst wieder einen
+  Voucher, wenn ein Admin sie fortsetzt. Sonst könnte jemand Code um Code abholen, indem er
+  jeden als „funktioniert nicht“ meldet.
+- **Rate-Limits:** kein `cache.incr` mehr. Der DB-Cache setzt dabei den Timeout auf
+  300 s zurück, dadurch wären alle Fenster auf 5 Minuten geschrumpft. Jetzt wird jeder
+  Eintrag mit explizitem Timeout geschrieben. Das Fenster beginnt mit dem ersten Versuch.
+- **Lock-Reihenfolge:** Alle Übergänge sperren Voucher → TicketRequest → Assignment, auch
+  `withdraw`. Mit einer festen Reihenfolge entstehen in PostgreSQL keine Deadlocks.
+- **Elternvoucher** werden nach dem Sperren erneut geprüft. Eine gleichzeitig verarbeitete
+  zweite Mail schließt dasselbe Kettenglied nicht doppelt ab.
+- **Account löschen** prüft „hält einen Voucher“ und löscht in einer Transaktion mit
+  gesperrten Wartelisten-Einträgen.

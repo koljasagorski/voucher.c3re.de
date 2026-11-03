@@ -1,6 +1,7 @@
 """Tiny fixed-window rate limiter on top of the Django cache (shared DB cache in production)."""
 
 import hashlib
+import time
 
 from django.conf import settings
 from django.core.cache import cache
@@ -16,15 +17,20 @@ def client_ip(request):
 
 
 def hit(scope, identifier, limit, window_seconds):
-    """Count one attempt. Returns ``False`` if the limit for this window is exceeded."""
+    """Count one attempt. Returns ``False`` if the limit for this window is exceeded.
+
+    The window starts with the first attempt. The entry is always written with an explicit
+    timeout: ``cache.incr`` must not be used, because the DB cache implements it as
+    get+set with the *default* timeout (300 s), which would shrink every window to 5 min.
+    """
     digest = hashlib.sha256(f"{scope}:{identifier}".lower().encode()).hexdigest()[:32]
     key = f"rl:{scope}:{digest}"
-    cache.add(key, 0, timeout=window_seconds)
-    try:
-        count = cache.incr(key)
-    except ValueError:  # expired between add and incr
-        cache.set(key, 1, timeout=window_seconds)
-        count = 1
+    now = time.time()
+    entry = cache.get(key)
+    if not entry or entry[0] + window_seconds <= now:
+        entry = (now, 0)
+    start, count = entry[0], entry[1] + 1
+    cache.set(key, (start, count), timeout=max(1, int(start + window_seconds - now) + 1))
     return count <= limit
 
 
