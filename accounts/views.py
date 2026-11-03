@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.shortcuts import redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods, require_POST
@@ -194,16 +195,20 @@ def account_settings(request):
     elif request.method == "POST" and "delete_account" in request.POST:
         delete_form = DeleteAccountForm(request.POST, prefix="delete")
         if delete_form.is_valid():
-            holding = user.ticket_requests.filter(status__in=TicketRequest.HOLDING_STATUSES).exists()
+            with transaction.atomic():
+                # Lock the user's requests so no voucher can be assigned between check and delete.
+                requests = list(user.ticket_requests.select_for_update())
+                holding = any(r.status in TicketRequest.HOLDING_STATUSES for r in requests)
+                if not holding:
+                    audit("account_deleted", user, actor=None, via=Via.DASHBOARD)
+                    user.delete()
             if holding:
                 delete_form.add_error(
                     None,
                     "Du hältst gerade einen Voucher. Schließe den Vorgang erst ab oder gib den Voucher zurück.",
                 )
             else:
-                audit("account_deleted", user, actor=None, via=Via.DASHBOARD)
                 logout(request)
-                user.delete()
                 return render(request, "accounts/message.html", {"title": "Account gelöscht", "text": "Dein Account und deine Einträge sind gelöscht."})
     return render(
         request,
